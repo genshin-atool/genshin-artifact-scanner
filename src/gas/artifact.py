@@ -88,7 +88,6 @@ class AttrKind(enum.StrEnum):
     ER = "er"
     EM = "em"
     HEALING = "healing"
-    SHIELD = "shield"
     PHYICAL_DMG = "physical_dmg"
     ANEMO_DMG = "anemo_dmg"
     GEO_DMG = "geo_dmg"

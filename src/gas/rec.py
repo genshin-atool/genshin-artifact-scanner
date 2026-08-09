@@ -2,6 +2,7 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import urllib.request
 from importlib.resources import as_file
 from importlib.resources.abc import Traversable
@@ -87,7 +88,10 @@ def _download_files(entries: list[dict], region: str, model_dir: Path) -> None:
         # so the final target is either a complete file or absent.
         part = target.with_suffix(target.suffix + ".part")
         try:
-            urllib.request.urlretrieve(url, part)
+            with urllib.request.urlopen(url, timeout=60) as response, open(
+                part, "wb"
+            ) as f:
+                shutil.copyfileobj(response, f)
             expected_sha256 = entry.get("sha256")
             if expected_sha256:
                 actual = hashlib.sha256(part.read_bytes()).hexdigest()
@@ -161,6 +165,9 @@ class TextRecognizer:
             for (index, _), result in zip(entries, batch_results):
                 results[index] = result
 
+        missing = [i for i, result in enumerate(results) if result is None]
+        if missing:
+            raise RuntimeError(f"OCR batch results missing for indices: {missing}")
         return results  # type: ignore[return-value]
 
     def _recognize_batch(

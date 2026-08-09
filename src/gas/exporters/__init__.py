@@ -5,6 +5,7 @@ from .. import artifact
 from ..config import DEFAULT_FORMAT
 from .genshin_atool import GenshinAToolExporter
 from .good import GoodExporter
+from .mona import MonaExporter
 
 
 class Exporter(Protocol):
@@ -23,6 +24,7 @@ class Exporter(Protocol):
 EXPORTERS: dict[str, Exporter] = {
     DEFAULT_FORMAT: GenshinAToolExporter(),
     "good": GoodExporter(),
+    "mona": MonaExporter(),
 }
 
 
@@ -45,4 +47,8 @@ def detect_format(path: str) -> str:
         if exporter.detect(content):
             return name
 
-    raise ValueError(f"Cannot detect format of {path!r}; specify --format")
+    formats = ", ".join(EXPORTERS)
+    raise ValueError(
+        f"Cannot detect format of {path!r}: its content does not match any "
+        f"supported format ({formats}); specify --format explicitly"
+    )

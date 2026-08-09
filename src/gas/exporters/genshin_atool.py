@@ -4,6 +4,7 @@ import tomllib
 import tomlkit
 
 from .. import artifact
+from ..log import Log
 
 _SCHEME = "genshin-atool"
 _VERSION = 1
@@ -25,7 +26,13 @@ class GenshinAToolExporter:
         if version is not None and version != _VERSION:
             raise ValueError(f"Unsupported version: {version!r}")
 
-        return artifact.from_dict_list(data.get("artifacts", []))
+        artifacts = []
+        for raw in data.get("artifacts", []):
+            try:
+                artifacts.append(artifact._from_dict(raw))
+            except (KeyError, ValueError) as e:
+                Log.warning(f"Skipping artifact: {e}")
+        return artifacts
 
     @classmethod
     def detect(cls, content: bytes) -> bool:

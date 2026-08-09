@@ -31,6 +31,13 @@ def main():
     )
     args = parser.parse_args()
 
+    try:
+        _run(args)
+    except (ValueError, FileNotFoundError) as e:
+        Log.error(e)
+
+
+def _run(args: argparse.Namespace) -> None:
     file_path = args.file or config.DEFAULT_FILE
 
     if args.format is not None:
@@ -39,7 +46,8 @@ def main():
         if os.path.isfile(file_path):
             try:
                 actual_format = detect_format(file_path)
-            except ValueError:
+            except ValueError as e:
+                Log.warning(f"{e}; proceeding with --format {format}")
                 actual_format = None
             if actual_format is not None and actual_format != format:
                 Log.error(
