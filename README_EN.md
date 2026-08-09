@@ -33,3 +33,11 @@ uv run gas --file good.json --format good
 # When --format is not specified, the format is auto-detected from the file content (genshin-atool files carry a format field; GOOD files carry their own format marker)
 uv run gas --file good.json --append
 ```
+
+## Supported formats
+
+| Format          | Description                           | Reference                                                                                                                 |
+| --------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `genshin-atool` | The tool's own format (TOML), default | No external spec                                                                                                          |
+| `good`          | Genshin Optimizer GOOD v3 JSON        | <https://frzyc.github.io/genshin-optimizer>                                                                               |
+| `mona`          | Mona artifact JSON                    | <https://github.com/wormtql/genshin_artifact> (consumer)<br><https://github.com/wormtql/yas> (YAS scanner, format source) |
