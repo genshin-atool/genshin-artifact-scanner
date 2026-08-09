@@ -1,0 +1,31 @@
+[project]
+name = "gas"
+version = "6.7.0"
+description = "Genshin Impact Artifact Scanner"
+readme = "README.md"
+authors = [
+    { name = "billin", email = "billindeng@outlook.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "numpy==2.3.5",
+    "onnxruntime-directml==1.23.0",
+    "opencv-python==4.10.0.84",
+    "pillow==12.3.0",
+    "pyautogui==0.9.54",
+    "pygetwindow==0.0.9",
+    "pywin32==312 ; sys_platform == 'win32'",
+    "tomlkit==0.15.1",
+]
+
+[project.scripts]
+gas = "gas.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.11.19,<0.12.0"]
+build-backend = "uv_build"
+
+[[tool.uv.index]]
+name = "tencent"
+url = "https://mirrors.cloud.tencent.com/pypi/simple"
+default = true

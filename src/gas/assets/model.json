@@ -1,0 +1,19 @@
+{
+  "name": "ppocr-v6-small",
+  "model": {
+    "name": "ppocr-v6-small.onnx",
+    "sha256": "5435fd747c9e0efe15a96d0b378d5bd157e9492ed8fd80edf08f30d02fa24634",
+    "urls": {
+      "global": "https://github.com/genshin-atool/genshin-artifact-scanner/releases/download/ocr-models/ppocr-v6-small.onnx",
+      "zh-CN": "https://github.com/genshin-atool/genshin-artifact-scanner/releases/download/ocr-models/ppocr-v6-small.onnx"
+    }
+  },
+  "dict": {
+    "name": "ppocr-v6-small.yml",
+    "sha256": "ab078671bb49f06228eadccd34f1bb501e157f7a047095ffb943ba81512c77d1",
+    "urls": {
+      "global": "https://github.com/genshin-atool/genshin-artifact-scanner/releases/download/ocr-models/ppocr-v6-small.yml",
+      "zh-CN": "https://github.com/genshin-atool/genshin-artifact-scanner/releases/download/ocr-models/ppocr-v6-small.yml"
+    }
+  }
+}
