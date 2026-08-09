@@ -1,4 +1,4 @@
-import os
+import json
 import re
 import time
 import tomllib
@@ -7,19 +7,44 @@ import pyautogui
 import pygetwindow as gw
 import win32gui
 
-import cv2
 import numpy as np
 
 from . import artifact
 from . import config as app_config
+from .image import hex_to_rgb, lower_quartile_luminance, similar_score_by_hist, similar_score_by_pixels
 from .log import Log
 from .rec import TextRecognizer
+from .text import fuzzy_match, normalize
 
-ARTIFACT_SET_ZH_TO_EN = {}
-with app_config.ASSETS.joinpath("artifacts.toml").open("rb") as file:
-    artifact_set_en_to_zh = tomllib.load(file)
-for k, v in artifact_set_en_to_zh.items():
-    ARTIFACT_SET_ZH_TO_EN[v] = k
+with app_config.ASSETS.joinpath("artifacts_index.json").open(encoding="utf-8") as file:
+    _ARTIFACT_INDEX = json.load(file)
+
+# Normalized name candidates merged from all languages, so whatever the OCR
+# recognizes is matched (exact or fuzzy)
+_SET_CANDIDATES: dict[str, artifact.ArtifactSet] = {}
+_PIECE_CANDIDATES: dict[str, artifact.ArtifactPiece] = {}
+for lang_index in _ARTIFACT_INDEX.values():
+    for name, enum_name in lang_index["setNames"].items():
+        _SET_CANDIDATES[normalize(name)] = artifact.ArtifactSet[enum_name]
+    for name, enum_name in lang_index["aliases"].items():
+        _SET_CANDIDATES[normalize(name)] = artifact.ArtifactSet[enum_name]
+    for name, enum_name in lang_index["pieceNames"].items():
+        _PIECE_CANDIDATES[normalize(name)] = artifact.ArtifactPiece[enum_name]
+
+# Short piece labels shown in the artifact detail panel (EN); genshin-db
+# only carries the full relic names (e.g. "Goblet of Eonothem")
+_PIECE_CANDIDATES.update(
+    {
+        "flower": artifact.ArtifactPiece.FLOWER,
+        "plume": artifact.ArtifactPiece.PLUME,
+        "sands": artifact.ArtifactPiece.SANDS,
+        "goblet": artifact.ArtifactPiece.GOBLET,
+        "circlet": artifact.ArtifactPiece.CIRCLET,
+    }
+)
+
+with app_config.ASSETS.joinpath("window_titles.json").open(encoding="utf-8") as file:
+    _WINDOW_TITLES = json.load(file)["titles"]
 
 OCR: TextRecognizer | None = None
 
@@ -29,8 +54,15 @@ INACTIVE_SUB_ATTR_PATTERN = re.compile(
 
 
 def _get_content_rect():
-    target_windows = gw.getWindowsWithTitle("原神")
-    if not target_windows:
+    """Locate the Genshin window and return its client area.
+
+    :return: (left, top, width, height) in screen coordinates, or None
+    """
+    for title in _WINDOW_TITLES:
+        target_windows = gw.getWindowsWithTitle(title)
+        if target_windows:
+            break
+    else:
         return None
 
     window = target_windows[0]
@@ -50,6 +82,7 @@ def _get_content_rect():
 
 
 def _load_rec_config(w, h):
+    """Load the scan layout config matching the given client size."""
     with app_config.ASSETS.joinpath("scan.toml").open("rb") as file:
         scan_config = tomllib.load(file)
 
@@ -63,55 +96,47 @@ def _load_rec_config(w, h):
 
 
 def _map_artifact_set(name: str):
-    if name in ARTIFACT_SET_ZH_TO_EN:
-        return artifact.ArtifactSet[ARTIFACT_SET_ZH_TO_EN[name].upper()]
-    elif name.find("海染") >= 0:
-        return artifact.ArtifactSet.OCEAN_HUED_CLAM
-
-    return artifact.ArtifactSet.UNKNOW
+    """Map an OCR set name (or piece alias) to an ArtifactSet, or UNKNOW."""
+    return fuzzy_match(name, _SET_CANDIDATES) or artifact.ArtifactSet.UNKNOW
 
 
 def _map_artifact_pos(name: str):
-    match name:
-        case "生之花":
-            return artifact.ArtifactPiece.FLOWER
-        case "死之羽":
-            return artifact.ArtifactPiece.PLUME
-        case "时之沙":
-            return artifact.ArtifactPiece.SANDS
-        case "空之杯":
-            return artifact.ArtifactPiece.GOBLET
-        case "理之冠":
-            return artifact.ArtifactPiece.CIRCLET
-        case _:
-            return None
+    """Map an OCR piece name to an ArtifactPiece, or None."""
+    return fuzzy_match(name, _PIECE_CANDIDATES)
 
 
 def _map_artifact_star(name: str):
+    """Infer rarity from the star glyph count (e.g. ★★★★★ -> 5)."""
     star = len(name)
     if star < 4 or star > 5:
         return 0
     return star
 
 
-_ATTR_KIND_KEYWORDS: list[tuple[str, artifact.AttrKind]] = [
-    ("暴击率", artifact.AttrKind.CR),
-    ("暴击伤害", artifact.AttrKind.CD),
-    ("元素精通", artifact.AttrKind.EM),
-    ("元素充能", artifact.AttrKind.ER),
-    ("物理", artifact.AttrKind.PHYICAL_DMG),
-    ("火元素", artifact.AttrKind.PYRO_DMG),
-    ("冰元素", artifact.AttrKind.CRYO_DMG),
-    ("雷元素", artifact.AttrKind.ELECTRO_DMG),
-    ("水元素", artifact.AttrKind.HYDRO_DMG),
-    ("风元素", artifact.AttrKind.ANEMO_DMG),
-    ("岩元素", artifact.AttrKind.GEO_DMG),
-    ("草元素", artifact.AttrKind.DENDRO_DMG),
-    ("治疗", artifact.AttrKind.HEALING),
-    ("攻击", artifact.AttrKind.ATK),
-    ("生命", artifact.AttrKind.HP),
-    ("防御", artifact.AttrKind.DEF),
-]
+_INACTIVE_MIN_LUMINANCE = 105.0
+_INACTIVE_LUMINANCE_DIFFERENCE = 24.0
+
+
+def _inactive_substat_indexes(images: list) -> set[int]:
+    """Detect grayed-out (inactive) substat lines by text luminance.
+
+    The darkest line is the active baseline; a line is inactive when its
+    text is clearly brighter than the baseline (mirrors the compose
+    ArtifactScanInactiveSubstatDetector).
+    """
+    if len(images) < 2:
+        return set()
+
+    scores = [lower_quartile_luminance(img) for img in images]
+    active_baseline = min(scores)
+
+    return {
+        index
+        for index, score in enumerate(scores)
+        if score >= _INACTIVE_MIN_LUMINANCE
+        and score - active_baseline >= _INACTIVE_LUMINANCE_DIFFERENCE
+    }
+
 
 _FLAT_TO_RATE_KINDS = {
     artifact.AttrKind.ATK: artifact.AttrKind.ATK_RATE,
@@ -119,33 +144,72 @@ _FLAT_TO_RATE_KINDS = {
     artifact.AttrKind.DEF: artifact.AttrKind.DEF_RATE,
 }
 
+_SEPARATOR_CHARS = set(".,，。·•⋅．")
+
+
+def _parse_stat_value(value: str, is_percentage: bool) -> float | None:
+    """Extract the numeric value from OCR text (mirrors compose).
+
+    For percentage values, scan backwards: digits are kept and the first
+    separator character becomes the decimal point (later ones are dropped).
+    For flat values only digits are kept.
+    """
+    if not value:
+        return None
+
+    if is_percentage:
+        has_decimal_point = False
+        buffer: list[str] = []
+        for char in reversed(value):
+            if char.isdigit():
+                buffer.append(char)
+            elif char in _SEPARATOR_CHARS and not has_decimal_point:
+                has_decimal_point = True
+                buffer.append(".")
+        cleaned = "".join(reversed(buffer))
+    else:
+        cleaned = "".join(char for char in value if char.isdigit())
+
+    if not cleaned:
+        return None
+    return float(cleaned)
+
+# Multi-language attribute name candidates (normalized name -> base kind)
+with app_config.ASSETS.joinpath("attribute_names.json").open(encoding="utf-8") as file:
+    _ATTRIBUTE_NAMES = json.load(file)
+_ATTR_CANDIDATES: dict[str, artifact.AttrKind] = {
+    name: artifact.AttrKind[kind] for name, kind in _ATTRIBUTE_NAMES.items()
+}
+
 
 def _map_attr(name: str, value: str) -> artifact.Attribute | None:
+    """Parse an attribute name + value pair into an Attribute.
+
+    The name is matched against the multi-language candidates (exact or
+    fuzzy); a percentage (value/name marker or non-flat kind) promotes
+    flat kinds to their rate variants.
+    """
     # Strip the UI activation marker before converting the numeric value.
     # The caller keeps inactive attributes separate from active sub-attributes.
     value = INACTIVE_SUB_ATTR_PATTERN.sub("", value.strip())
 
-    for keyword, kind in _ATTR_KIND_KEYWORDS:
-        if keyword not in name:
-            continue
-        if value.endswith("%"):
-            kind = _FLAT_TO_RATE_KINDS.get(kind, kind)
-            return artifact.Attribute(kind, float(value.strip("%")) / 100.0)
-        if kind.is_flat:
-            cleaned = value.replace(" ", "").replace(",", "").replace(".", "")
-            return artifact.Attribute(kind, int(cleaned))
-        return artifact.Attribute(kind, float(value.strip("%")) / 100.0)
+    kind = fuzzy_match(name, _ATTR_CANDIDATES)
+    if kind is None:
+        return None
 
-    return None
+    is_percent = "%" in value or "%" in name or not kind.is_flat
+    numeric_value = _parse_stat_value(value, is_percent)
+    if numeric_value is None:
+        return None
 
-
-def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-    """将十六进制颜色字符串转换为RGB元组 (0-255)"""
-    hex_color = hex_color.lstrip("#")  # 去除开头的#
-    return (int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16))
+    if is_percent:
+        kind = _FLAT_TO_RATE_KINDS.get(kind, kind)
+        return artifact.Attribute(kind, numeric_value / 100.0)
+    return artifact.Attribute(kind, int(numeric_value))
 
 
 def _rec_artifact(img, det) -> artifact.Artifact | None:
+    """Recognize a single artifact card: crop regions, OCR, then parse."""
     artifact_det = det["artifact_info"]
 
     ocr_input = []
@@ -164,7 +228,7 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
     artifact_defined_px = artifact_defined_bound[2] - int(artifact_defined_height / 2)
     artifact_defined_pixel = img.getpixel((artifact_defined_px, artifact_defined_py))
     # Log.debug(artifact_defined_pixel)
-    if artifact_defined_pixel == _hex_to_rgb(artifact_defined_color):
+    if artifact_defined_pixel == hex_to_rgb(artifact_defined_color):
         toffset = artifact_defined_height
 
     l = name_and_subattr[0]
@@ -172,11 +236,15 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
     r = name_and_subattr[2]
     h = (name_and_subattr[3] - name_and_subattr[1]) / 5
 
+    sub_attr_images = []
     for _ in range(5):
         b = t + h
         tmp_img = img.crop((l, t, r, b))
+        sub_attr_images.append(tmp_img)
         ocr_input.append(np.array(tmp_img))
         t = b
+
+    inactive_substat_indexes = _inactive_substat_indexes(sub_attr_images)
 
     # 5 main attr
     main_attr = artifact_det["main_attr"]
@@ -205,6 +273,11 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
     tmp_img = img.crop(level)
     ocr_input.append(np.array(tmp_img))
 
+    # 10 item name (set-specific piece name, for set reverse-derivation)
+    item_name = artifact_det["item_name"]
+    tmp_img = img.crop(item_name)
+    ocr_input.append(np.array(tmp_img))
+
     global OCR
     if OCR is None:
         OCR = TextRecognizer()
@@ -219,6 +292,7 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
     main_attr = None
     sub_attrs = []
     inactive_sub_attrs = []
+    set_name_text = None
 
     i = 0
 
@@ -227,20 +301,14 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
 
         txt: str = item[0]
         if i <= 4:
-            txt = re.sub(
-                r"""
-                [·,:：;；]  # 删除特定符号
-                | \s+       # 删除所有空白字符
-                | (?<=\d),(?=\d)  # 删除数字中间的逗号（如 4,780）
-                """,
-                "",
-                txt,
-                flags=re.X,
-            )
             name_and_value = txt.split("+")
             if len(name_and_value) == 2:
+                # Inactive (grayed-out) substats are detected by text
+                # luminance; the zh marker in the text is kept as a fallback
                 is_inactive = (
-                    INACTIVE_SUB_ATTR_PATTERN.search(name_and_value[1]) is not None
+                    i in inactive_substat_indexes
+                    or INACTIVE_SUB_ATTR_PATTERN.search(name_and_value[1])
+                    is not None
                 )
                 sub_attr = _map_attr(*name_and_value)
                 if sub_attr is None:
@@ -250,10 +318,9 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
                 else:
                     sub_attrs.append(sub_attr)
             elif (i == 3 or i == 4) and len(name_and_value) == 1:
-                artifact_set = _map_artifact_set(name_and_value[0])
-                if artifact_set == artifact.ArtifactSet.UNKNOW:
-                    Log.warning(f"artifact set not found for {name_and_value[0]}")
-                else:
+                set_name_text = name_and_value[0]
+                artifact_set = _map_artifact_set(set_name_text)
+                if artifact_set != artifact.ArtifactSet.UNKNOW:
                     i = 5
                     continue
         elif i <= 5:
@@ -275,17 +342,33 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
             artifact_star = _map_artifact_star(name)
             if artifact_star < 5:
                 break
-            if artifact_star == 0:
-                Log.warning(f"artifact star not found for {name}")
         elif i <= 9:
-            name = txt.strip().replace("+", "")
-            artifact_level = int(name)
+            name = txt.strip()
+            level_value = _parse_stat_value(name, False)
+            artifact_level = int(level_value) if level_value is not None else -1
             if artifact_level < 0 or artifact_level > 20:
                 Log.warning(f"artifact level not found for {name}")
                 artifact_level = -1
             break
 
         i += 1
+
+    if artifact_set == artifact.ArtifactSet.UNKNOW:
+        # The set name may be obscured (e.g. "(unactivated)"); derive the
+        # set from the item name via aliases, like compose
+        item_name_text = ocr_output[10][0].strip()
+        set_from_item = fuzzy_match(item_name_text, _SET_CANDIDATES)
+        if set_from_item is not None:
+            artifact_set = set_from_item
+
+    # Only log when the set could not be resolved at all
+    if artifact_set == artifact.ArtifactSet.UNKNOW and (
+        set_name_text or item_name_text
+    ):
+        Log.warning(
+            f"artifact set not found for set name {set_name_text!r} "
+            f"item name {item_name_text!r}"
+        )
 
     if (
         artifact_pos is None
@@ -294,7 +377,7 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
         or artifact_level > 20
         or artifact_star < 4
     ):
-        Log.error(f"illeagal rec artifact {ocr_output}")
+        Log.error(f"illegal rec artifact {ocr_output}")
         return None
 
     art = artifact.Artifact(
@@ -314,6 +397,7 @@ def _is_existing_artifact(
     art: artifact.Artifact,
     existing_hashes: set[str],
 ) -> bool:
+    """Round the artifact attrs and check its hash against existing ones."""
     if not existing_hashes:
         return False
 
@@ -322,6 +406,10 @@ def _is_existing_artifact(
 
 
 def _scan_page(det: dict, existing_hashes: set[str]):
+    """Scan one page: click each card, OCR it, stop on a known artifact.
+
+    :return: (artifacts, existing_found), or None when aborted by mouse
+    """
     row = det["panel"]["row"]
     col = det["panel"]["col"]
 
@@ -382,36 +470,11 @@ def _scan_page(det: dict, existing_hashes: set[str]):
     return artifacts, False
 
 
-def _similar_score_by_hist(img1, img2):
-    # 转换为HSV色彩空间
-    img1_hsv = cv2.cvtColor(np.array(img1), cv2.COLOR_BGR2HSV)
-    img2_hsv = cv2.cvtColor(np.array(img2), cv2.COLOR_BGR2HSV)
-
-    # 计算直方图
-    hist1 = cv2.calcHist([img1_hsv], [0, 1], None, [50, 60], [0, 180, 0, 256])
-    hist2 = cv2.calcHist([img2_hsv], [0, 1], None, [50, 60], [0, 180, 0, 256])
-
-    # 归一化并比对
-    cv2.normalize(hist1, hist1, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-    cv2.normalize(hist2, hist2, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
-    similarity = cv2.compareHist(hist1, hist2, cv2.HISTCMP_CORREL)
-
-    return similarity
-
-
-def _similar_score_by_pixels(img1, img2):
-    img1 = np.array(img1)
-    img2 = np.array(img2)
-
-    diff = img1 - img2
-    score = np.mean(abs(diff) < 0.25)
-    return score
-
-
 _GAP_IMG = None
 
 
 def _turning_page(det: dict, scroll_clicks: int):
+    """Scroll to the next page; returns the scroll clicks used, 0 when done."""
     row = det["panel"]["row"]
     gap_row = det["panel"]["gap_row"]
     bound = det["panel"]["bound"]
@@ -451,14 +514,14 @@ def _turning_page(det: dict, scroll_clicks: int):
             pyautogui.scroll(clicks=scroll_clicks, _pause=False)
             time.sleep(0.05)
             new_gap_img = pyautogui.screenshot(region=gap_rec)
-            new_similar_ratio_value = _similar_score_by_hist(_GAP_IMG, new_gap_img)
+            new_similar_ratio_value = similar_score_by_hist(_GAP_IMG, new_gap_img)
             if new_similar_ratio_value > 0.9:
                 break
 
         time.sleep(0.6)
         new_gap_img = pyautogui.screenshot(region=panel_rec)
 
-        similar_score_value = _similar_score_by_pixels(gap_img, new_gap_img)
+        similar_score_value = similar_score_by_pixels(gap_img, new_gap_img)
         if similar_score_value > 0.9:
             Log.info("scolled to end")
             return 0
@@ -478,7 +541,7 @@ def _turning_page(det: dict, scroll_clicks: int):
         clicks = clicks - 1
 
         new_gap_img = pyautogui.screenshot(region=gap_rec)
-        new_similar_ratio_value = _similar_score_by_hist(_GAP_IMG, new_gap_img)
+        new_similar_ratio_value = similar_score_by_hist(_GAP_IMG, new_gap_img)
         delta = new_similar_ratio_value - similar_ratio_value
         Log.debug(f"row delta:{delta} similar_ratio_value: {new_similar_ratio_value}")
         if delta > 0.3 and new_similar_ratio_value > 0.75:
@@ -504,6 +567,7 @@ def _turning_page(det: dict, scroll_clicks: int):
 
 
 def _scan_panel(det: dict, existing_hashes: set[str]):
+    """Scan the whole panel, turning pages until done or a known artifact."""
     scroll_clicks = 0
     artifacts = []
 
@@ -526,6 +590,7 @@ def _scan_panel(det: dict, existing_hashes: set[str]):
 
 
 def _preresolve_config(det_config: dict, window_rect: tuple[int, int, int, int]):
+    """Shift layout coordinates from window-relative to screen coordinates."""
     det_panel = det_config["panel"]["bound"]
 
     det_config["panel"]["bound"] = (
@@ -556,6 +621,12 @@ def _preresolve_config(det_config: dict, window_rect: tuple[int, int, int, int])
 
 
 def start(existing_hashes: set[str] | None = None):
+    """Scan the artifact inventory from the game window.
+
+    :param existing_hashes: hashes to dedupe against; scanning stops at the
+        first already-known artifact
+    :return: the scanned artifacts, or None on failure
+    """
     window_rect = _get_content_rect()
     if window_rect is None:
         Log.error("No genshin window found")
