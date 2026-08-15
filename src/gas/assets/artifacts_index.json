@@ -1054,11 +1054,11 @@
       "Éveil du Marcheur du feu": "LAVAWALKER"
     },
     "pieceNames": {
-      "Coupe d'éonothème": "GOBLET",
+      "Coupe d'Eonothem": "GOBLET",
       "Diadème de Logos": "CIRCLET",
-      "Fleur de la vie": "FLOWER",
-      "Plume de la mort": "PLUME",
-      "Sables du temps": "SANDS"
+      "Fleur de la Vie": "FLOWER",
+      "Plume de la Mort": "PLUME",
+      "Sables du Temps": "SANDS"
     },
     "setNames": {
       "Amour chéri": "MAIDEN_BELOVED",
@@ -2716,8 +2716,8 @@
       "Ânfora das Flores Escarlates": "EMBLEM_OF_SEVERED_FATE"
     },
     "pieceNames": {
-      "Areia do tempo": "SANDS",
-      "Cálice de Eonothem": "GOBLET",
+      "Areia do Tempo": "SANDS",
+      "Cálice de Erátema": "GOBLET",
       "Flor da Vida": "FLOWER",
       "Pluma da Morte": "PLUME",
       "Tiara de Logos": "CIRCLET"
