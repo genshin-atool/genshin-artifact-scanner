@@ -3,7 +3,7 @@ import math
 
 from .. import artifact
 from ..log import Log
-from .stats import MAIN_ATTR_KINDS, SUB_STAT_KINDS, main_attribute_value
+from .stats import MAIN_STAT_KINDS, SUB_STAT_KINDS, main_stat_value
 
 _FORMAT = "GOOD"
 _SOURCE = "Genshin ATool"
@@ -18,25 +18,25 @@ _SLOT_KEYS = {
 }
 
 _STAT_KEYS = {
-    artifact.AttrKind.HP: "hp",
-    artifact.AttrKind.HP_RATE: "hp_",
-    artifact.AttrKind.ATK: "atk",
-    artifact.AttrKind.ATK_RATE: "atk_",
-    artifact.AttrKind.DEF: "def",
-    artifact.AttrKind.DEF_RATE: "def_",
-    artifact.AttrKind.CR: "critRate_",
-    artifact.AttrKind.CD: "critDMG_",
-    artifact.AttrKind.ER: "enerRech_",
-    artifact.AttrKind.EM: "eleMas",
-    artifact.AttrKind.HEALING: "heal_",
-    artifact.AttrKind.PHYICAL_DMG: "physical_dmg_",
-    artifact.AttrKind.ANEMO_DMG: "anemo_dmg_",
-    artifact.AttrKind.GEO_DMG: "geo_dmg_",
-    artifact.AttrKind.ELECTRO_DMG: "electro_dmg_",
-    artifact.AttrKind.DENDRO_DMG: "dendro_dmg_",
-    artifact.AttrKind.HYDRO_DMG: "hydro_dmg_",
-    artifact.AttrKind.PYRO_DMG: "pyro_dmg_",
-    artifact.AttrKind.CRYO_DMG: "cryo_dmg_",
+    artifact.StatKind.HP: "hp",
+    artifact.StatKind.HP_RATE: "hp_",
+    artifact.StatKind.ATK: "atk",
+    artifact.StatKind.ATK_RATE: "atk_",
+    artifact.StatKind.DEF: "def",
+    artifact.StatKind.DEF_RATE: "def_",
+    artifact.StatKind.CR: "critRate_",
+    artifact.StatKind.CD: "critDMG_",
+    artifact.StatKind.ER: "enerRech_",
+    artifact.StatKind.EM: "eleMas",
+    artifact.StatKind.HEALING: "heal_",
+    artifact.StatKind.PHYICAL_DMG: "physical_dmg_",
+    artifact.StatKind.ANEMO_DMG: "anemo_dmg_",
+    artifact.StatKind.GEO_DMG: "geo_dmg_",
+    artifact.StatKind.ELECTRO_DMG: "electro_dmg_",
+    artifact.StatKind.DENDRO_DMG: "dendro_dmg_",
+    artifact.StatKind.HYDRO_DMG: "hydro_dmg_",
+    artifact.StatKind.PYRO_DMG: "pyro_dmg_",
+    artifact.StatKind.CRYO_DMG: "cryo_dmg_",
 }
 
 # Artifact sets not in the current GOOD schema (or unknown) are skipped
@@ -91,6 +91,7 @@ _SET_KEYS = {
     artifact.ArtifactSet.UNKNOW: None,
 }
 
+
 class GoodExporter:
     """GOOD (Genshin Open Object Descriptor) v3.
 
@@ -118,17 +119,17 @@ class GoodExporter:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(root, f, ensure_ascii=False, indent=2)
 
+
 def _to_good_file(artifacts: list[artifact.Artifact]) -> dict:
     return {
         "format": _FORMAT,
         "source": _SOURCE,
         "version": _VERSION,
         "artifacts": [
-            good
-            for art in artifacts
-            if (good := _to_good_artifact(art)) is not None
+            good for art in artifacts if (good := _to_good_artifact(art)) is not None
         ],
     }
+
 
 def _to_good_artifact(art: artifact.Artifact) -> dict | None:
     set_key = _SET_KEYS[art.set]
@@ -144,35 +145,39 @@ def _to_good_artifact(art: artifact.Artifact) -> dict | None:
             "slotKey": _SLOT_KEYS[art.piece],
             "level": art.level,
             "rarity": art.rarity,
-            "mainStatKey": _to_good_stat_key(art.main_attr),
+            "mainStatKey": _to_good_stat_key(art.main_stat),
             "location": "",
             "lock": False,
-            "substats": [_to_good_substat(attr) for attr in art.sub_attrs],
+            "substats": [_to_good_substat(stat) for stat in art.sub_stats],
         }
-        if art.inactive_sub_attrs:
+        if art.inactive_sub_stats:
             good["unactivatedSubstats"] = [
-                _to_good_substat(attr) for attr in art.inactive_sub_attrs
+                _to_good_substat(stat) for stat in art.inactive_sub_stats
             ]
         return good
     except ValueError as e:
         Log.warning(f"Skipping artifact: {e}")
         return None
 
-def _to_good_substat(attr: artifact.Attribute) -> dict:
+
+def _to_good_substat(stat: artifact.Stat) -> dict:
     return {
-        "key": _to_good_stat_key(attr),
-        "value": _to_good_value(attr),
+        "key": _to_good_stat_key(stat),
+        "value": _to_good_value(stat),
     }
 
-def _to_good_stat_key(attr: artifact.Attribute) -> str:
-    try:
-        return _STAT_KEYS[attr.kind]
-    except KeyError:
-        raise ValueError(f"{attr.kind.name} is not a valid GOOD stat") from None
 
-def _to_good_value(attr: artifact.Attribute) -> float:
-    value = attr.value if attr.kind.is_flat else attr.value * 100.0
+def _to_good_stat_key(stat: artifact.Stat) -> str:
+    try:
+        return _STAT_KEYS[stat.kind]
+    except KeyError:
+        raise ValueError(f"{stat.kind.name} is not a valid GOOD stat") from None
+
+
+def _to_good_value(stat: artifact.Stat) -> float:
+    value = stat.value if stat.kind.is_flat else stat.value * 100.0
     return round(value, 6)
+
 
 _GOOD_SLOT_KEYS = {key: piece for piece, key in _SLOT_KEYS.items()}
 _GOOD_STAT_KINDS = {key: kind for kind, key in _STAT_KEYS.items()}
@@ -194,6 +199,7 @@ def _from_good_file(root: dict) -> list[artifact.Artifact]:
         for raw in root.get("artifacts", [])
         if (art := _from_good_artifact(raw)) is not None
     ]
+
 
 def _from_good_artifact(raw: dict) -> artifact.Artifact | None:
     try:
@@ -220,7 +226,7 @@ def _from_good_artifact(raw: dict) -> artifact.Artifact | None:
         main_kind = _GOOD_STAT_KINDS.get(main_stat_key)
         if main_kind is None:
             raise ValueError(f"Unsupported GOOD mainStatKey: {main_stat_key!r}")
-        if main_kind not in MAIN_ATTR_KINDS[piece]:
+        if main_kind not in MAIN_STAT_KINDS[piece]:
             raise ValueError(
                 f"{main_stat_key!r} is not a valid main stat for {slot_key!r}"
             )
@@ -230,14 +236,14 @@ def _from_good_artifact(raw: dict) -> artifact.Artifact | None:
             piece=piece,
             rarity=rarity,
             level=level,
-            main_attr=artifact.Attribute(
-                main_kind, main_attribute_value(main_kind, rarity, level)
+            main_stat=artifact.Stat(
+                main_kind, main_stat_value(main_kind, rarity, level)
             ),
-            sub_attrs=[
+            sub_stats=[
                 _from_good_substat(raw_substat)
                 for raw_substat in raw.get("substats", [])
             ],
-            inactive_sub_attrs=[
+            inactive_sub_stats=[
                 _from_good_substat(raw_substat)
                 for raw_substat in raw.get("unactivatedSubstats", [])
             ],
@@ -246,7 +252,8 @@ def _from_good_artifact(raw: dict) -> artifact.Artifact | None:
         Log.warning(f"Skipping artifact: {e}")
         return None
 
-def _from_good_substat(raw: dict) -> artifact.Attribute:
+
+def _from_good_substat(raw: dict) -> artifact.Stat:
     stat_key = raw.get("key")
     kind = _GOOD_STAT_KINDS.get(stat_key)
     if kind is None:
@@ -261,4 +268,4 @@ def _from_good_substat(raw: dict) -> artifact.Attribute:
         raise ValueError(f"Invalid GOOD substat value: {value!r}")
 
     value = value / 100.0 if not kind.is_flat else value
-    return artifact.Attribute(kind, value)
+    return artifact.Stat(kind, value)

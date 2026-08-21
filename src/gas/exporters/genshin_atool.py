@@ -68,14 +68,14 @@ def _dumps_artifacts(artifacts: list[artifact.Artifact]):
         artifact_dict = artifact.to_dict(art)
         artifact_table = tomlkit.table()
         for name, value in artifact_dict.items():
-            if name == "main_attr":
+            if name == "main_stat":
                 artifact_table.add(name, _dumps_inline_table(value))
-            elif name in ("sub_attrs", "inactive_sub_attrs"):
-                sub_attrs_arr = tomlkit.array()
-                for sub_attr in value:
-                    sub_attrs_arr.add_line(_dumps_inline_table(sub_attr))
-                sub_attrs_arr.add_line(indent="")
-                artifact_table.add(name, sub_attrs_arr)
+            elif name in ("sub_stats", "inactive_sub_stats"):
+                sub_stats_arr = tomlkit.array()
+                for sub_stat in value:
+                    sub_stats_arr.add_line(_dumps_inline_table(sub_stat))
+                sub_stats_arr.add_line(indent="")
+                artifact_table.add(name, sub_stats_arr)
             else:
                 artifact_table.add(name, value)
 

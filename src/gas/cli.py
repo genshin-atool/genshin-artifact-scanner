@@ -73,7 +73,7 @@ def _run(args: argparse.Namespace) -> None:
         return
 
     for art in artifacts:
-        artifact.round_attrs(art)
+        artifact.round_stats(art)
 
     merged = artifacts + existing_artifacts if args.append else artifacts
     exporter.dump(file_path, merged)

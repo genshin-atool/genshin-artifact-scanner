@@ -76,7 +76,7 @@ class ArtifactPiece(enum.Enum):
     CIRCLET = 4
 
 
-class AttrKind(enum.StrEnum):
+class StatKind(enum.StrEnum):
     HP = "hp"
     HP_RATE = "hp_rate"
     ATK = "atk"
@@ -99,24 +99,24 @@ class AttrKind(enum.StrEnum):
 
     @property
     def is_flat(self) -> bool:
-        """Flat (non-percentage) attribute kinds."""
-        return self in (AttrKind.HP, AttrKind.ATK, AttrKind.DEF, AttrKind.EM)
+        """Flat (non-percentage) stat kinds."""
+        return self in (StatKind.HP, StatKind.ATK, StatKind.DEF, StatKind.EM)
 
 
 @dataclass(frozen=True, slots=True)
-class Attribute:
-    kind: AttrKind
+class Stat:
+    kind: StatKind
     value: float
 
-    def rounded(self, digits: int = 3) -> "Attribute":
+    def rounded(self, digits: int = 3) -> "Stat":
         """Round the value for percentage kinds; flat kinds are kept as-is."""
         if self.kind.is_flat:
             return self
-        return Attribute(self.kind, round(self.value, digits))
+        return Stat(self.kind, round(self.value, digits))
 
     @property
     def hash_text(self) -> str:
-        return f"Attribute.{self.kind.name}({self.value!r},)"
+        return f"Stat.{self.kind.name}({self.value!r},)"
 
     def __str__(self) -> str:
         return f"{self.kind.name}({self.value!r})"
@@ -128,16 +128,16 @@ class Artifact:
     piece: ArtifactPiece
     rarity: int
     level: int
-    main_attr: Attribute
-    sub_attrs: list[Attribute]
-    inactive_sub_attrs: list[Attribute] = field(default_factory=list)
+    main_stat: Stat
+    sub_stats: list[Stat]
+    inactive_sub_stats: list[Stat] = field(default_factory=list)
 
 
-def round_attrs(artifact: Artifact):
-    artifact.main_attr = artifact.main_attr.rounded()
-    artifact.sub_attrs = [attr.rounded() for attr in artifact.sub_attrs]
-    artifact.inactive_sub_attrs = [
-        attr.rounded() for attr in artifact.inactive_sub_attrs
+def round_stats(artifact: Artifact):
+    artifact.main_stat = artifact.main_stat.rounded()
+    artifact.sub_stats = [stat.rounded() for stat in artifact.sub_stats]
+    artifact.inactive_sub_stats = [
+        stat.rounded() for stat in artifact.inactive_sub_stats
     ]
 
 
@@ -148,11 +148,11 @@ def hash_artifact(artifact: Artifact) -> str:
     hash_value.update(artifact.rarity.to_bytes())
     hash_value.update(artifact.level.to_bytes())
 
-    hash_value.update(artifact.main_attr.hash_text.encode("utf8"))
-    for attr in artifact.sub_attrs:
-        hash_value.update(attr.hash_text.encode("utf8"))
-    for attr in artifact.inactive_sub_attrs:
-        hash_value.update(attr.hash_text.encode("utf8"))
+    hash_value.update(artifact.main_stat.hash_text.encode("utf8"))
+    for stat in artifact.sub_stats:
+        hash_value.update(stat.hash_text.encode("utf8"))
+    for stat in artifact.inactive_sub_stats:
+        hash_value.update(stat.hash_text.encode("utf8"))
 
     return base64.encodebytes(hash_value.digest()).decode("utf8").strip()
 
@@ -161,7 +161,7 @@ def hash_artifacts(artifacts: list[Artifact]) -> set[str]:
     """Hashes of the artifacts after rounding, used for dedupe."""
     hashes = set()
     for art in artifacts:
-        round_attrs(art)
+        round_stats(art)
         hashes.add(hash_artifact(art))
     return hashes
 
@@ -172,12 +172,12 @@ def to_dict(artifact: Artifact):
         "piece": artifact.piece.name,
         "rarity": artifact.rarity,
         "level": artifact.level,
-        "main_attr": _attr_to_dict(artifact.main_attr),
-        "sub_attrs": [_attr_to_dict(attr) for attr in artifact.sub_attrs],
+        "main_stat": _stat_to_dict(artifact.main_stat),
+        "sub_stats": [_stat_to_dict(stat) for stat in artifact.sub_stats],
     }
-    if artifact.inactive_sub_attrs:
-        artifact_dict["inactive_sub_attrs"] = [
-            _attr_to_dict(attr) for attr in artifact.inactive_sub_attrs
+    if artifact.inactive_sub_stats:
+        artifact_dict["inactive_sub_stats"] = [
+            _stat_to_dict(stat) for stat in artifact.inactive_sub_stats
         ]
     return artifact_dict
 
@@ -186,20 +186,20 @@ def from_dict_list(artifact_dict_list: list):
     return [_from_dict(artifact_dict) for artifact_dict in artifact_dict_list]
 
 
-def _attr_to_dict(attr: Attribute):
-    return {"name": attr.kind.value, "value": attr.value}
+def _stat_to_dict(stat: Stat):
+    return {"name": stat.kind.value, "value": stat.value}
 
 
-def _create_attr(name: str, attr_value: float) -> Attribute:
-    kind = AttrKind(name)
-    value = int(attr_value) if kind.is_flat else attr_value
-    return Attribute(kind, value)
+def _create_stat(name: str, stat_value: float) -> Stat:
+    kind = StatKind(name)
+    value = int(stat_value) if kind.is_flat else stat_value
+    return Stat(kind, value)
 
 
-def _attr_from_dict(attr_dict: dict):
-    attr_type = attr_dict["name"]
-    attr_value = attr_dict["value"]
-    return _create_attr(attr_type, attr_value)
+def _stat_from_dict(stat_dict: dict):
+    stat_type = stat_dict["name"]
+    stat_value = stat_dict["value"]
+    return _create_stat(stat_type, stat_value)
 
 
 def _from_dict(artifact_dict: dict):
@@ -208,11 +208,14 @@ def _from_dict(artifact_dict: dict):
         piece=ArtifactPiece[artifact_dict["piece"]],
         rarity=artifact_dict["rarity"],
         level=artifact_dict["level"],
-        main_attr=_attr_from_dict(artifact_dict["main_attr"]),  # type: ignore
-        sub_attrs=[_attr_from_dict(attr) for attr in artifact_dict["sub_attrs"]],  # type: ignore
-        inactive_sub_attrs=[
-            _attr_from_dict(attr) for attr in artifact_dict.get("inactive_sub_attrs", [])
-        ],  # type: ignore
+        main_stat=_stat_from_dict(artifact_dict["main_stat"]),
+        sub_stats=[
+            _stat_from_dict(stat) for stat in artifact_dict.get("sub_stats", [])
+        ],
+        inactive_sub_stats=[
+            _stat_from_dict(stat)
+            for stat in artifact_dict.get("inactive_sub_stats", [])
+        ],
     )
     return artifact
 
@@ -235,14 +238,14 @@ def _is_eq(src: Artifact, dst: Artifact):
     if src.level != dst.level:
         return False
 
-    if src.main_attr != dst.main_attr:
+    if src.main_stat != dst.main_stat:
         return False
 
-    for src_sub_attr, dst_sub_attr in zip(src.sub_attrs, dst.sub_attrs):
-        if src_sub_attr != dst_sub_attr:
+    for src_sub_stat, dst_sub_stat in zip(src.sub_stats, dst.sub_stats):
+        if src_sub_stat != dst_sub_stat:
             return False
 
-    if src.inactive_sub_attrs != dst.inactive_sub_attrs:
+    if src.inactive_sub_stats != dst.inactive_sub_stats:
         return False
 
     return True
@@ -264,14 +267,14 @@ def _print_artifact_pretty(
         artifact.piece.name,
         _COLOR_RESET,
         "main:",
-        artifact.main_attr,
+        artifact.main_stat,
         artifact.rarity,
         end="\n",
     )
 
-    for i, sub_attr in enumerate(artifact.sub_attrs):
-        print(f"    sub{i + 1}:", sub_attr, end="\n")
+    for i, sub_stat in enumerate(artifact.sub_stats):
+        print(f"    sub{i + 1}:", sub_stat, end="\n")
 
-    for i, sub_attr in enumerate(artifact.inactive_sub_attrs):
-        index = len(artifact.sub_attrs) + i + 1
-        print(f"{_COLOR_DIM_GREY}    sub{index}: {sub_attr}{_COLOR_RESET}")
+    for i, sub_stat in enumerate(artifact.inactive_sub_stats):
+        index = len(artifact.sub_stats) + i + 1
+        print(f"{_COLOR_DIM_GREY}    sub{index}: {sub_stat}{_COLOR_RESET}")

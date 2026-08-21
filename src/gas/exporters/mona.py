@@ -3,7 +3,7 @@ import math
 
 from .. import artifact
 from ..log import Log
-from .stats import MAIN_ATTR_KINDS, SUB_STAT_KINDS, main_attribute_value
+from .stats import MAIN_STAT_KINDS, SUB_STAT_KINDS, main_stat_value
 
 _VERSION = "1"
 
@@ -16,25 +16,25 @@ _SLOT_KEYS = {
 }
 
 _STAT_KEYS = {
-    artifact.AttrKind.HP: "lifeStatic",
-    artifact.AttrKind.HP_RATE: "lifePercentage",
-    artifact.AttrKind.ATK: "attackStatic",
-    artifact.AttrKind.ATK_RATE: "attackPercentage",
-    artifact.AttrKind.DEF: "defendStatic",
-    artifact.AttrKind.DEF_RATE: "defendPercentage",
-    artifact.AttrKind.CR: "critical",
-    artifact.AttrKind.CD: "criticalDamage",
-    artifact.AttrKind.ER: "recharge",
-    artifact.AttrKind.EM: "elementalMastery",
-    artifact.AttrKind.HEALING: "cureEffect",
-    artifact.AttrKind.PHYICAL_DMG: "physicalBonus",
-    artifact.AttrKind.ANEMO_DMG: "windBonus",
-    artifact.AttrKind.GEO_DMG: "rockBonus",
-    artifact.AttrKind.ELECTRO_DMG: "thunderBonus",
-    artifact.AttrKind.DENDRO_DMG: "dendroBonus",
-    artifact.AttrKind.HYDRO_DMG: "waterBonus",
-    artifact.AttrKind.PYRO_DMG: "fireBonus",
-    artifact.AttrKind.CRYO_DMG: "iceBonus",
+    artifact.StatKind.HP: "lifeStatic",
+    artifact.StatKind.HP_RATE: "lifePercentage",
+    artifact.StatKind.ATK: "attackStatic",
+    artifact.StatKind.ATK_RATE: "attackPercentage",
+    artifact.StatKind.DEF: "defendStatic",
+    artifact.StatKind.DEF_RATE: "defendPercentage",
+    artifact.StatKind.CR: "critical",
+    artifact.StatKind.CD: "criticalDamage",
+    artifact.StatKind.ER: "recharge",
+    artifact.StatKind.EM: "elementalMastery",
+    artifact.StatKind.HEALING: "cureEffect",
+    artifact.StatKind.PHYICAL_DMG: "physicalBonus",
+    artifact.StatKind.ANEMO_DMG: "windBonus",
+    artifact.StatKind.GEO_DMG: "rockBonus",
+    artifact.StatKind.ELECTRO_DMG: "thunderBonus",
+    artifact.StatKind.DENDRO_DMG: "dendroBonus",
+    artifact.StatKind.HYDRO_DMG: "waterBonus",
+    artifact.StatKind.PYRO_DMG: "fireBonus",
+    artifact.StatKind.CRYO_DMG: "iceBonus",
 }
 
 # Artifact sets not in the YAS schema are skipped with a warning at export time
@@ -156,8 +156,8 @@ def _to_mona_artifact(art: artifact.Artifact) -> dict | None:
         return {
             "setName": set_key,
             "position": _SLOT_KEYS[art.piece],
-            "mainTag": _to_mona_stat(art.main_attr),
-            "normalTags": [_to_mona_stat(attr) for attr in art.sub_attrs],
+            "mainTag": _to_mona_stat(art.main_stat),
+            "normalTags": [_to_mona_stat(stat) for stat in art.sub_stats],
             "omit": False,
             "level": art.level,
             "star": art.rarity,
@@ -168,12 +168,12 @@ def _to_mona_artifact(art: artifact.Artifact) -> dict | None:
         return None
 
 
-def _to_mona_stat(attr: artifact.Attribute) -> dict:
+def _to_mona_stat(stat: artifact.Stat) -> dict:
     try:
-        name = _STAT_KEYS[attr.kind]
+        name = _STAT_KEYS[stat.kind]
     except KeyError:
-        raise ValueError(f"{attr.kind.name} is not a valid Mona stat") from None
-    return {"name": name, "value": attr.value}
+        raise ValueError(f"{stat.kind.name} is not a valid Mona stat") from None
+    return {"name": name, "value": stat.value}
 
 
 def _from_mona_file(root: dict) -> list[artifact.Artifact]:
@@ -215,7 +215,7 @@ def _from_mona_artifact(
         main_kind = _MONA_STAT_KINDS.get(main_tag.get("name"))
         if main_kind is None:
             raise ValueError(f"Unsupported Mona mainTag name: {main_tag.get('name')!r}")
-        if main_kind not in MAIN_ATTR_KINDS[piece]:
+        if main_kind not in MAIN_STAT_KINDS[piece]:
             raise ValueError(
                 f"{main_tag.get('name')!r} is not a valid main stat for {raw.get('position')!r}"
             )
@@ -225,10 +225,10 @@ def _from_mona_artifact(
             piece=piece,
             rarity=rarity,
             level=level,
-            main_attr=artifact.Attribute(
-                main_kind, main_attribute_value(main_kind, rarity, level)
+            main_stat=artifact.Stat(
+                main_kind, main_stat_value(main_kind, rarity, level)
             ),
-            sub_attrs=[
+            sub_stats=[
                 _from_mona_substat(tag) for tag in raw.get("normalTags", [])
             ],
         )
@@ -237,7 +237,7 @@ def _from_mona_artifact(
         return None
 
 
-def _from_mona_substat(raw: dict) -> artifact.Attribute:
+def _from_mona_substat(raw: dict) -> artifact.Stat:
     stat_key = raw.get("name")
     kind = _MONA_STAT_KINDS.get(stat_key)
     if kind is None:
@@ -253,4 +253,4 @@ def _from_mona_substat(raw: dict) -> artifact.Attribute:
 
     # Mona stores ratios for percentage stats; flat values are ints in our model
     value = int(value) if kind.is_flat else value
-    return artifact.Attribute(kind, value)
+    return artifact.Stat(kind, value)

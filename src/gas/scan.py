@@ -48,7 +48,7 @@ with app_config.ASSETS.joinpath("window_titles.json").open(encoding="utf-8") as 
 
 OCR: TextRecognizer | None = None
 
-INACTIVE_SUB_ATTR_PATTERN = re.compile(
+INACTIVE_SUB_STAT_PATTERN = re.compile(
     r"(?:[（(](?:待|未)(?:激(?:活)?)?[）)]?|(?:待|未)激(?:活)?[）)]?)$"
 )
 
@@ -139,9 +139,9 @@ def _inactive_substat_indexes(images: list) -> set[int]:
 
 
 _FLAT_TO_RATE_KINDS = {
-    artifact.AttrKind.ATK: artifact.AttrKind.ATK_RATE,
-    artifact.AttrKind.HP: artifact.AttrKind.HP_RATE,
-    artifact.AttrKind.DEF: artifact.AttrKind.DEF_RATE,
+    artifact.StatKind.ATK: artifact.StatKind.ATK_RATE,
+    artifact.StatKind.HP: artifact.StatKind.HP_RATE,
+    artifact.StatKind.DEF: artifact.StatKind.DEF_RATE,
 }
 
 _SEPARATOR_CHARS = set(".,，。·•⋅．")
@@ -174,26 +174,27 @@ def _parse_stat_value(value: str, is_percentage: bool) -> float | None:
         return None
     return float(cleaned)
 
-# Multi-language attribute name candidates (normalized name -> base kind)
-with app_config.ASSETS.joinpath("attribute_names.json").open(encoding="utf-8") as file:
-    _ATTRIBUTE_NAMES = json.load(file)
-_ATTR_CANDIDATES: dict[str, artifact.AttrKind] = {
-    name: artifact.AttrKind[kind] for name, kind in _ATTRIBUTE_NAMES.items()
+
+# Multi-language stat name candidates (normalized name -> base kind)
+with app_config.ASSETS.joinpath("stat_names.json").open(encoding="utf-8") as file:
+    _STAT_NAMES = json.load(file)
+_STAT_CANDIDATES: dict[str, artifact.StatKind] = {
+    name: artifact.StatKind[kind] for name, kind in _STAT_NAMES.items()
 }
 
 
-def _map_attr(name: str, value: str) -> artifact.Attribute | None:
-    """Parse an attribute name + value pair into an Attribute.
+def _map_stat(name: str, value: str) -> artifact.Stat | None:
+    """Parse a stat name + value pair into a Stat.
 
     The name is matched against the multi-language candidates (exact or
     fuzzy); a percentage (value/name marker or non-flat kind) promotes
     flat kinds to their rate variants.
     """
     # Strip the UI activation marker before converting the numeric value.
-    # The caller keeps inactive attributes separate from active sub-attributes.
-    value = INACTIVE_SUB_ATTR_PATTERN.sub("", value.strip())
+    # The caller keeps inactive stats separate from active sub-stats.
+    value = INACTIVE_SUB_STAT_PATTERN.sub("", value.strip())
 
-    kind = fuzzy_match(name, _ATTR_CANDIDATES)
+    kind = fuzzy_match(name, _STAT_CANDIDATES)
     if kind is None:
         return None
 
@@ -204,8 +205,8 @@ def _map_attr(name: str, value: str) -> artifact.Attribute | None:
 
     if is_percent:
         kind = _FLAT_TO_RATE_KINDS.get(kind, kind)
-        return artifact.Attribute(kind, numeric_value / 100.0)
-    return artifact.Attribute(kind, int(numeric_value))
+        return artifact.Stat(kind, numeric_value / 100.0)
+    return artifact.Stat(kind, int(numeric_value))
 
 
 def _rec_artifact(img, det) -> artifact.Artifact | None:
@@ -214,46 +215,41 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
 
     ocr_input = []
 
-    # 0 - 4 sub attr and name
-    name_and_subattr = artifact_det["name_and_subattr"]
+    # 0 - 4 sub stat and name
+    name_and_substat = artifact_det["name_and_substat"]
 
     artifact_defined_bound = artifact_det["artifact_defined_with_sanctifying_elixir"]
-    artifact_defined_color = artifact_det[
-        "artifact_defined_with_sanctifying_elixir_color"
-    ]
-
+    crop_img = img.crop(artifact_defined_bound)
+    crop_img = crop_img.convert("L")
+    is_defined = False
     toffset = 0
-    artifact_defined_height = artifact_defined_bound[3] - artifact_defined_bound[1]
-    artifact_defined_py = artifact_defined_bound[3] - int(artifact_defined_height / 2)
-    artifact_defined_px = artifact_defined_bound[2] - int(artifact_defined_height / 2)
-    artifact_defined_pixel = img.getpixel((artifact_defined_px, artifact_defined_py))
-    # Log.debug(artifact_defined_pixel)
-    if artifact_defined_pixel == hex_to_rgb(artifact_defined_color):
-        toffset = artifact_defined_height
+    if np.array(crop_img).mean() > 100:
+        is_defined = True
+        toffset = int(det["defined_offset"])
 
-    l = name_and_subattr[0]
-    t = name_and_subattr[1] + toffset
-    r = name_and_subattr[2]
-    h = (name_and_subattr[3] - name_and_subattr[1]) / 5
+    l, t, r, b = name_and_substat
+    t += toffset
+    b += toffset
+    h = (b - t) // 5
 
-    sub_attr_images = []
+    sub_stat_images = []
     for _ in range(5):
         b = t + h
         tmp_img = img.crop((l, t, r, b))
-        sub_attr_images.append(tmp_img)
+        sub_stat_images.append(tmp_img)
         ocr_input.append(np.array(tmp_img))
         t = b
 
-    inactive_substat_indexes = _inactive_substat_indexes(sub_attr_images)
+    inactive_substat_indexes = _inactive_substat_indexes(sub_stat_images)
 
-    # 5 main attr
-    main_attr = artifact_det["main_attr"]
-    tmp_img = img.crop(main_attr)
+    # 5 main stat
+    main_stat_rect = artifact_det["main_stat"]
+    tmp_img = img.crop(main_stat_rect)
     ocr_input.append(np.array(tmp_img))
 
-    # 6 main attr value
-    main_attr_value = artifact_det["main_attr_value"]
-    tmp_img = img.crop(main_attr_value)
+    # 6 main stat value
+    main_stat_value_rect = artifact_det["main_stat_value"]
+    tmp_img = img.crop(main_stat_value_rect)
     ocr_input.append(np.array(tmp_img))
 
     # 7 pos
@@ -289,9 +285,9 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
     artifact_pos = None
     artifact_star = 0
     artifact_level = -1
-    main_attr = None
-    sub_attrs = []
-    inactive_sub_attrs = []
+    main_stat = None
+    sub_stats = []
+    inactive_sub_stats = []
     set_name_text = None
 
     i = 0
@@ -307,16 +303,16 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
                 # luminance; the zh marker in the text is kept as a fallback
                 is_inactive = (
                     i in inactive_substat_indexes
-                    or INACTIVE_SUB_ATTR_PATTERN.search(name_and_value[1])
+                    or INACTIVE_SUB_STAT_PATTERN.search(name_and_value[1])
                     is not None
                 )
-                sub_attr = _map_attr(*name_and_value)
-                if sub_attr is None:
-                    Log.warning(f"sub attr not found for {txt}")
+                sub_stat = _map_stat(*name_and_value)
+                if sub_stat is None:
+                    Log.warning(f"sub stat not found for {txt}")
                 elif is_inactive:
-                    inactive_sub_attrs.append(sub_attr)
+                    inactive_sub_stats.append(sub_stat)
                 else:
-                    sub_attrs.append(sub_attr)
+                    sub_stats.append(sub_stat)
             elif (i == 3 or i == 4) and len(name_and_value) == 1:
                 set_name_text = name_and_value[0]
                 artifact_set = _map_artifact_set(set_name_text)
@@ -326,9 +322,9 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
         elif i <= 5:
             name = txt.strip()
             value = ocr_output[i + 1][0].strip()
-            main_attr = _map_attr(name, value)
-            if main_attr is None:
-                Log.warning(f"main attr not found for {name} {value}")
+            main_stat = _map_stat(name, value)
+            if main_stat is None:
+                Log.warning(f"main stat not found for {name} {value}")
                 break
             i = 7
             continue
@@ -372,7 +368,7 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
 
     if (
         artifact_pos is None
-        or main_attr is None
+        or main_stat is None
         or artifact_level < 0
         or artifact_level > 20
         or artifact_star < 4
@@ -385,9 +381,9 @@ def _rec_artifact(img, det) -> artifact.Artifact | None:
         piece=artifact_pos,
         rarity=artifact_star,
         level=artifact_level,
-        main_attr=main_attr,  # type: ignore
-        sub_attrs=sub_attrs,
-        inactive_sub_attrs=inactive_sub_attrs,
+        main_stat=main_stat,
+        sub_stats=sub_stats,
+        inactive_sub_stats=inactive_sub_stats,
     )
 
     return art
@@ -397,11 +393,11 @@ def _is_existing_artifact(
     art: artifact.Artifact,
     existing_hashes: set[str],
 ) -> bool:
-    """Round the artifact attrs and check its hash against existing ones."""
+    """Round the artifact stats and check its hash against existing ones."""
     if not existing_hashes:
         return False
 
-    artifact.round_attrs(art)
+    artifact.round_stats(art)
     return artifact.hash_artifact(art) in existing_hashes
 
 
