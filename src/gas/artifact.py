@@ -88,7 +88,7 @@ class StatKind(enum.StrEnum):
     ER = "er"
     EM = "em"
     HEALING = "healing"
-    PHYICAL_DMG = "physical_dmg"
+    PHYSICAL_DMG = "physical_dmg"
     ANEMO_DMG = "anemo_dmg"
     GEO_DMG = "geo_dmg"
     ELECTRO_DMG = "electro_dmg"

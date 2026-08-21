@@ -27,7 +27,7 @@ _STAT_KEYS = {
     artifact.StatKind.ER: "recharge",
     artifact.StatKind.EM: "elementalMastery",
     artifact.StatKind.HEALING: "cureEffect",
-    artifact.StatKind.PHYICAL_DMG: "physicalBonus",
+    artifact.StatKind.PHYSICAL_DMG: "physicalBonus",
     artifact.StatKind.ANEMO_DMG: "windBonus",
     artifact.StatKind.GEO_DMG: "rockBonus",
     artifact.StatKind.ELECTRO_DMG: "thunderBonus",

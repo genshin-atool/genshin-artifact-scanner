@@ -29,7 +29,7 @@ _STAT_KEYS = {
     artifact.StatKind.ER: "enerRech_",
     artifact.StatKind.EM: "eleMas",
     artifact.StatKind.HEALING: "heal_",
-    artifact.StatKind.PHYICAL_DMG: "physical_dmg_",
+    artifact.StatKind.PHYSICAL_DMG: "physical_dmg_",
     artifact.StatKind.ANEMO_DMG: "anemo_dmg_",
     artifact.StatKind.GEO_DMG: "geo_dmg_",
     artifact.StatKind.ELECTRO_DMG: "electro_dmg_",
