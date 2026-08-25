@@ -18,62 +18,62 @@ _COLOR_BLUE = "\033[94m"
 _COLOR_RESET = "\033[0m"
 
 
-class ArtifactSet(enum.Enum):
-    SILKEN_MOONS_SERENADE = 0
-    NIGHT_OF_THE_SKYS_UNVEILING = 1
-    A_DAY_CARVED_FROM_RISING_WINDS = 2
-    AUBADE_OF_MORNINGSTAR_AND_MOON = 3
-    DISENCHANTMENT_IN_DEEP_SHADOW = 4
-    CELESTIAL_GIFT = 5
-    HEART_OF_THE_FURNACE = 6
-    SCARLET_PROOF = 7
-    FINALE_OF_THE_DEEP_GALLERIES = 8
-    LONG_NIGHTS_OATH = 9
-    OBSIDIAN_CODEX = 10
-    SCROLL_OF_THE_HERO_OF_CINDER_CITY = 11
-    SONG_OF_DAYS_PAST = 12
-    UNFINISHED_REVERIE = 13
-    FRAGMENT_OF_HARMONIC_WHIMSY = 14
-    NIGHTTIME_WHISPERS_IN_THE_ECHOING_WOODS = 15
-    GOLDEN_TROUPE = 16
-    MARECHAUSSEE_HUNTER = 17
-    VOURUKASHAS_GLOW = 18
-    NYMPHS_DREAM = 19
-    DESERT_PAVILION_CHRONICLE = 20
-    FLOWER_OF_PARADISE_LOST = 21
-    DEEPWOOD_MEMORIES = 22
-    GILDED_DREAMS = 23
-    VERMILLION_HEREAFTER = 24
-    ECHOES_OF_AN_OFFERING = 25
-    HUSK_OF_OPULENT_DREAMS = 26
-    OCEAN_HUED_CLAM = 27
-    EMBLEM_OF_SEVERED_FATE = 28
-    SHIMENAWAS_REMINISCENCE = 29
-    TENACITY_OF_THE_MILLELITH = 30
-    ARCHAIC_PETRA = 31
-    NOBLESSE_OBLIGE = 32
-    PALE_FLAME = 33
-    RETRACING_BOLIDE = 34
-    THUNDERING_FURY = 35
-    THUNDER_SOOTHER = 36
-    CRIMSON_WITCH_OF_FLAMES = 37
-    LAVAWALKER = 38
-    VIRIDESCENT_VENERER = 39
-    MAIDEN_BELOVED = 40
-    HEART_OF_DEPTH = 41
-    BLIZZARD_STRAYER = 42
-    WANDERERS_TROUPE = 43
-    GLADIATORS_FINALE = 44
-    BLOODSTAINED_CHIVALRY = 45
-    UNKNOW = 46
+class ArtifactSet(enum.StrEnum):
+    SILKEN_MOONS_SERENADE = "silken_moons_serenade"
+    NIGHT_OF_THE_SKYS_UNVEILING = "night_of_the_skys_unveiling"
+    A_DAY_CARVED_FROM_RISING_WINDS = "a_day_carved_from_rising_winds"
+    AUBADE_OF_MORNINGSTAR_AND_MOON = "aubade_of_morningstar_and_moon"
+    DISENCHANTMENT_IN_DEEP_SHADOW = "disenchantment_in_deep_shadow"
+    CELESTIAL_GIFT = "celestial_gift"
+    HEART_OF_THE_FURNACE = "heart_of_the_furnace"
+    SCARLET_PROOF = "scarlet_proof"
+    FINALE_OF_THE_DEEP_GALLERIES = "finale_of_the_deep_galleries"
+    LONG_NIGHTS_OATH = "long_nights_oath"
+    OBSIDIAN_CODEX = "obsidian_codex"
+    SCROLL_OF_THE_HERO_OF_CINDER_CITY = "scroll_of_the_hero_of_cinder_city"
+    SONG_OF_DAYS_PAST = "song_of_days_past"
+    UNFINISHED_REVERIE = "unfinished_reverie"
+    FRAGMENT_OF_HARMONIC_WHIMSY = "fragment_of_harmonic_whimsy"
+    NIGHTTIME_WHISPERS_IN_THE_ECHOING_WOODS = "nighttime_whispers_in_the_echoing_woods"
+    GOLDEN_TROUPE = "golden_troupe"
+    MARECHAUSSEE_HUNTER = "marechaussee_hunter"
+    VOURUKASHAS_GLOW = "vourukashas_glow"
+    NYMPHS_DREAM = "nymphs_dream"
+    DESERT_PAVILION_CHRONICLE = "desert_pavilion_chronicle"
+    FLOWER_OF_PARADISE_LOST = "flower_of_paradise_lost"
+    DEEPWOOD_MEMORIES = "deepwood_memories"
+    GILDED_DREAMS = "gilded_dreams"
+    VERMILLION_HEREAFTER = "vermillion_hereafter"
+    ECHOES_OF_AN_OFFERING = "echoes_of_an_offering"
+    HUSK_OF_OPULENT_DREAMS = "husk_of_opulent_dreams"
+    OCEAN_HUED_CLAM = "ocean_hued_clam"
+    EMBLEM_OF_SEVERED_FATE = "emblem_of_severed_fate"
+    SHIMENAWAS_REMINISCENCE = "shimenawas_reminiscence"
+    TENACITY_OF_THE_MILLELITH = "tenacity_of_the_millelith"
+    ARCHAIC_PETRA = "archaic_petra"
+    NOBLESSE_OBLIGE = "noblesse_oblige"
+    PALE_FLAME = "pale_flame"
+    RETRACING_BOLIDE = "retracing_bolide"
+    THUNDERING_FURY = "thundering_fury"
+    THUNDER_SOOTHER = "thunder_soother"
+    CRIMSON_WITCH_OF_FLAMES = "crimson_witch_of_flames"
+    LAVAWALKER = "lavawalker"
+    VIRIDESCENT_VENERER = "viridescent_venerer"
+    MAIDEN_BELOVED = "maiden_beloved"
+    HEART_OF_DEPTH = "heart_of_depth"
+    BLIZZARD_STRAYER = "blizzard_strayer"
+    WANDERERS_TROUPE = "wanderers_troupe"
+    GLADIATORS_FINALE = "gladiators_finale"
+    BLOODSTAINED_CHIVALRY = "bloodstained_chivalry"
+    UNKNOW = "unknow"
 
 
-class ArtifactPiece(enum.Enum):
-    FLOWER = 0
-    PLUME = 1
-    SANDS = 2
-    GOBLET = 3
-    CIRCLET = 4
+class ArtifactPiece(enum.StrEnum):
+    FLOWER = "flower"
+    PLUME = "plume"
+    SANDS = "sands"
+    GOBLET = "goblet"
+    CIRCLET = "circlet"
 
 
 class StatKind(enum.StrEnum):
@@ -168,8 +168,8 @@ def hash_artifacts(artifacts: list[Artifact]) -> set[str]:
 
 def to_dict(artifact: Artifact):
     artifact_dict = {
-        "set": artifact.set.name,
-        "piece": artifact.piece.name,
+        "set": artifact.set.value,
+        "piece": artifact.piece.value,
         "rarity": artifact.rarity,
         "level": artifact.level,
         "main_stat": _stat_to_dict(artifact.main_stat),
@@ -204,8 +204,8 @@ def _stat_from_dict(stat_dict: dict):
 
 def _from_dict(artifact_dict: dict):
     artifact = Artifact(
-        set=ArtifactSet[artifact_dict["set"]],
-        piece=ArtifactPiece[artifact_dict["piece"]],
+        set=ArtifactSet(artifact_dict["set"]),
+        piece=ArtifactPiece(artifact_dict["piece"]),
         rarity=artifact_dict["rarity"],
         level=artifact_dict["level"],
         main_stat=_stat_from_dict(artifact_dict["main_stat"]),

@@ -25,11 +25,11 @@ _SET_CANDIDATES: dict[str, artifact.ArtifactSet] = {}
 _PIECE_CANDIDATES: dict[str, artifact.ArtifactPiece] = {}
 for lang_index in _ARTIFACT_INDEX.values():
     for name, enum_name in lang_index["setNames"].items():
-        _SET_CANDIDATES[normalize(name)] = artifact.ArtifactSet[enum_name]
+        _SET_CANDIDATES[normalize(name)] = artifact.ArtifactSet(enum_name)
     for name, enum_name in lang_index["aliases"].items():
-        _SET_CANDIDATES[normalize(name)] = artifact.ArtifactSet[enum_name]
+        _SET_CANDIDATES[normalize(name)] = artifact.ArtifactSet(enum_name)
     for name, enum_name in lang_index["pieceNames"].items():
-        _PIECE_CANDIDATES[normalize(name)] = artifact.ArtifactPiece[enum_name]
+        _PIECE_CANDIDATES[normalize(name)] = artifact.ArtifactPiece(enum_name)
 
 # Short piece labels shown in the artifact detail panel (EN); genshin-db
 # only carries the full relic names (e.g. "Goblet of Eonothem")
@@ -179,7 +179,7 @@ def _parse_stat_value(value: str, is_percentage: bool) -> float | None:
 with app_config.ASSETS.joinpath("stat_names.json").open(encoding="utf-8") as file:
     _STAT_NAMES = json.load(file)
 _STAT_CANDIDATES: dict[str, artifact.StatKind] = {
-    name: artifact.StatKind[kind] for name, kind in _STAT_NAMES.items()
+    name: artifact.StatKind(kind) for name, kind in _STAT_NAMES.items()
 }
 
 
