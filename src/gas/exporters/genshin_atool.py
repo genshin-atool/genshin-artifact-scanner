@@ -6,7 +6,7 @@ import tomlkit
 from .. import artifact
 from ..log import Log
 
-_SCHEME = "genshin-atool"
+_SCHEME = "gatool-artifacts"
 _VERSION = 1
 
 

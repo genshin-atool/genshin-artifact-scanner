@@ -18,7 +18,7 @@ uv sync
 4. 游戏分辨率需为 **1920x1080**（当前 `assets/scan.toml` 仅支持该分辨率，如需其他分辨率请在此文件中添加对应配置）。
 
 ```sh
-# 扫描，保存到默认文件 ./gas.toml（genshin-atool 格式）
+# 扫描，保存到默认文件 ./gas.toml（gatool-artifacts 格式）
 uv run gas
 
 # 扫描，保存到指定文件
@@ -30,14 +30,14 @@ uv run gas --file mybag.toml --append
 # 指定 GOOD (Genshin Optimizer) JSON 格式
 uv run gas --file good.json --format good
 
-# 未指定 --format 时，自动从文件内容识别格式（genshin-atool 文件带 format 字段，GOOD 文件自带 format 标识）
+# 未指定 --format 时，自动从文件内容识别格式（gatool-artifacts 文件带 format 字段，GOOD 文件自带 format 标识）
 uv run gas --file good.json --append
 ```
 
 ## 支持格式
 
-| 格式            | 说明                              | 参考                                                                                                                |
-| --------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `genshin-atool` | 本工具自有格式（TOML），默认格式  | 无外部规范                                                                                                          |
+| 格式               | 说明                             | 参考                                                                                                                |
+| ------------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `gatool-artifacts` | 本工具自有格式（TOML），默认格式 | 无外部规范                                                                                                          |
 | `good`          | Genshin Optimizer 的 GOOD v3 JSON | <https://frzyc.github.io/genshin-optimizer>                                                                         |
 | `mona`          | 莫娜占卜铺的圣遗物 JSON           | <https://github.com/wormtql/genshin_artifact>（消费端）<br><https://github.com/wormtql/yas>（YAS 扫描器，格式来源） |

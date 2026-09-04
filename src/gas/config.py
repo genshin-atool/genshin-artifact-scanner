@@ -5,7 +5,7 @@ from pathlib import Path
 ASSETS = resources.files(__package__).joinpath("assets")
 
 DEFAULT_FILE = "gas.toml"
-DEFAULT_FORMAT = "genshin-atool"
+DEFAULT_FORMAT = "gatool-artifacts"
 
 # OCR model download config (addresses) shipped with the package
 OCR_MODEL_CONFIG = ASSETS.joinpath("model.json")
