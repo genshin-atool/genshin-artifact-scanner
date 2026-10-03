@@ -52,51 +52,52 @@ MAIN_STAT_KINDS = {
     },
 }
 
-# Main stat value at level 0 and at max level (start, end), per rarity.
-MAIN_STAT_RANGES = {
-    (4, artifact.StatKind.HP): (645.0, 3_571.0),
-    (4, artifact.StatKind.ATK): (42.0, 232.0),
-    (4, artifact.StatKind.HP_RATE): (0.063, 0.348),
-    (4, artifact.StatKind.ATK_RATE): (0.063, 0.348),
-    (4, artifact.StatKind.DEF_RATE): (0.079, 0.435),
-    (4, artifact.StatKind.EM): (25.2, 139.3),
-    (4, artifact.StatKind.ER): (0.070, 0.387),
-    (4, artifact.StatKind.CR): (0.042, 0.232),
-    (4, artifact.StatKind.CD): (0.084, 0.464),
-    (4, artifact.StatKind.HEALING): (0.048, 0.268),
-    (4, artifact.StatKind.PHYSICAL_DMG): (0.079, 0.435),
-    (4, artifact.StatKind.ANEMO_DMG): (0.063, 0.348),
-    (4, artifact.StatKind.GEO_DMG): (0.063, 0.348),
-    (4, artifact.StatKind.ELECTRO_DMG): (0.063, 0.348),
-    (4, artifact.StatKind.DENDRO_DMG): (0.063, 0.348),
-    (4, artifact.StatKind.HYDRO_DMG): (0.063, 0.348),
-    (4, artifact.StatKind.PYRO_DMG): (0.063, 0.348),
-    (4, artifact.StatKind.CRYO_DMG): (0.063, 0.348),
-    (5, artifact.StatKind.HP): (717.0, 4_780.0),
-    (5, artifact.StatKind.ATK): (47.0, 311.0),
-    (5, artifact.StatKind.HP_RATE): (0.070, 0.466),
-    (5, artifact.StatKind.ATK_RATE): (0.070, 0.466),
-    (5, artifact.StatKind.DEF_RATE): (0.087, 0.583),
-    (5, artifact.StatKind.EM): (28.0, 186.5),
-    (5, artifact.StatKind.ER): (0.078, 0.518),
-    (5, artifact.StatKind.CR): (0.047, 0.311),
-    (5, artifact.StatKind.CD): (0.093, 0.622),
-    (5, artifact.StatKind.HEALING): (0.054, 0.359),
-    (5, artifact.StatKind.PHYSICAL_DMG): (0.087, 0.583),
-    (5, artifact.StatKind.ANEMO_DMG): (0.070, 0.466),
-    (5, artifact.StatKind.GEO_DMG): (0.070, 0.466),
-    (5, artifact.StatKind.ELECTRO_DMG): (0.070, 0.466),
-    (5, artifact.StatKind.DENDRO_DMG): (0.070, 0.466),
-    (5, artifact.StatKind.HYDRO_DMG): (0.070, 0.466),
-    (5, artifact.StatKind.PYRO_DMG): (0.070, 0.466),
-    (5, artifact.StatKind.CRYO_DMG): (0.070, 0.466),
+MAIN_STAT_COEFFICIENTS = {
+    (4, artifact.StatKind.HP): 26.8900602,
+    (4, artifact.StatKind.ATK): 1.7469879,
+    (4, artifact.StatKind.HP_RATE): 0.0052409,
+    (4, artifact.StatKind.ATK_RATE): 0.0052409,
+    (4, artifact.StatKind.DEF_RATE): 0.0065512,
+    (4, artifact.StatKind.EM): 2.0933735,
+    (4, artifact.StatKind.ER): 0.0058283,
+    (4, artifact.StatKind.CR): 0.0034939,
+    (4, artifact.StatKind.CD): 0.0069879,
+    (4, artifact.StatKind.HEALING): 0.0040351,
+    (4, artifact.StatKind.PHYSICAL_DMG): 0.0065512,
+    (4, artifact.StatKind.ANEMO_DMG): 0.0052409,
+    (4, artifact.StatKind.GEO_DMG): 0.0052409,
+    (4, artifact.StatKind.ELECTRO_DMG): 0.0052409,
+    (4, artifact.StatKind.DENDRO_DMG): 0.0052409,
+    (4, artifact.StatKind.HYDRO_DMG): 0.0052409,
+    (4, artifact.StatKind.PYRO_DMG): 0.0052409,
+    (4, artifact.StatKind.CRYO_DMG): 0.0052409,
+    (5, artifact.StatKind.HP): 29.8754,
+    (5, artifact.StatKind.ATK): 1.9449977,
+    (5, artifact.StatKind.HP_RATE): 0.0058282,
+    (5, artifact.StatKind.ATK_RATE): 0.0058282,
+    (5, artifact.StatKind.DEF_RATE): 0.0072841,
+    (5, artifact.StatKind.EM): 2.3332930,
+    (5, artifact.StatKind.ER): 0.0064750,
+    (5, artifact.StatKind.CR): 0.0038858,
+    (5, artifact.StatKind.CD): 0.0077710,
+    (5, artifact.StatKind.HEALING): 0.0044835,
+    (5, artifact.StatKind.PHYSICAL_DMG): 0.0072841,
+    (5, artifact.StatKind.ANEMO_DMG): 0.0058282,
+    (5, artifact.StatKind.GEO_DMG): 0.0058282,
+    (5, artifact.StatKind.ELECTRO_DMG): 0.0058282,
+    (5, artifact.StatKind.DENDRO_DMG): 0.0058282,
+    (5, artifact.StatKind.HYDRO_DMG): 0.0058282,
+    (5, artifact.StatKind.PYRO_DMG): 0.0058282,
+    (5, artifact.StatKind.CRYO_DMG): 0.0058282,
 }
+
+_FLAT_KINDS = {artifact.StatKind.HP, artifact.StatKind.ATK}
 
 
 def main_stat_value(kind: artifact.StatKind, rarity: int, level: int) -> float | int:
-    start, end = MAIN_STAT_RANGES[(rarity, kind)]
-    maximum_level = 16 if rarity == 4 else 20
-    value = start + (end - start) * level / maximum_level
+    coefficient = MAIN_STAT_COEFFICIENTS[(rarity, kind)]
+    factor = 0.4 if kind in _FLAT_KINDS else 0.2
+    value = coefficient * factor * (17 * level + 60)
 
     # HP, ATK and EM are integers in the game display
     if kind in (artifact.StatKind.HP, artifact.StatKind.ATK, artifact.StatKind.EM):
